@@ -1,6 +1,11 @@
 spring:
   application:
     name: blog-backend
+  main:
+    allow-definition-overriding: true
+  context:
+    initializer:
+      classes: com.blog.config.DotenvInitializer
 
   datasource:
     url: jdbc:mysql://localhost:3306/blog_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
