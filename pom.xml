@@ -47,13 +47,6 @@
 			<version>2.5.0</version>
 		</dependency>
 
-		<!-- Dotenv -->
-		<dependency>
-			<groupId>io.github.cdimascio</groupId>
-			<artifactId>java-dotenv</artifactId>
-			<version>5.2.2</version>
-		</dependency>
-
 		<!-- MySQL Driver -->
 		<dependency>
 			<groupId>com.mysql</groupId>
