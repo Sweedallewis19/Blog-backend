@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 public class PostResponse {
     private Long id;
     private String title;
+    private String slug;
     private String content;
     private Boolean published;
     private UserResponse user;

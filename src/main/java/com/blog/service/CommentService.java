@@ -65,6 +65,39 @@ public class CommentService {
     }
 
     @Transactional
+    public CommentResponse createCommentBySlug(String slug, CommentRequest request, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email", userEmail));
+
+        Post post = postRepository.findBySlugAndNotDeleted(slug)
+                .orElseThrow(() -> new ResourceNotFoundException("Post", "slug", slug));
+
+        Comment comment = commentMapper.toEntity(request);
+        comment.setUser(user);
+        comment.setPost(post);
+
+        if (request.getParentId() != null) {
+            Comment parentComment = commentRepository.findById(request.getParentId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Comment", "id", request.getParentId()));
+            comment.setParent(parentComment);
+        }
+
+        Comment savedComment = commentRepository.save(comment);
+        return commentMapper.toResponse(savedComment);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CommentResponse> getCommentsByPostSlug(String slug) {
+        Post post = postRepository.findBySlugAndNotDeleted(slug)
+                .orElseThrow(() -> new ResourceNotFoundException("Post", "slug", slug));
+
+        List<Comment> topLevelComments = commentRepository.findTopLevelCommentsByPostId(post.getId());
+        return topLevelComments.stream()
+                .map(this::buildCommentTree)
+                .toList();
+    }
+
+    @Transactional
     public void deleteComment(Long id, String userEmail) {
         Comment comment = commentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment", "id", id));
