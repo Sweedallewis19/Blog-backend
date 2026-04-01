@@ -35,6 +35,10 @@ public class CommentService {
         Post post = postRepository.findByIdAndNotDeleted(request.getPostId())
                 .orElseThrow(() -> new ResourceNotFoundException("Post", "id", request.getPostId()));
 
+        if (!post.getPublished() && !post.getUser().getId().equals(user.getId())) {
+            throw new ResourceNotFoundException("Post", "id", request.getPostId());
+        }
+
         Comment comment = commentMapper.toEntity(request);
         comment.setUser(user);
         comment.setPost(post);
@@ -71,6 +75,10 @@ public class CommentService {
 
         Post post = postRepository.findBySlugAndNotDeleted(slug)
                 .orElseThrow(() -> new ResourceNotFoundException("Post", "slug", slug));
+
+        if (!post.getPublished() && !post.getUser().getId().equals(user.getId())) {
+            throw new ResourceNotFoundException("Post", "slug", slug);
+        }
 
         Comment comment = commentMapper.toEntity(request);
         comment.setUser(user);

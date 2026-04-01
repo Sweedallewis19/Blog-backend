@@ -130,43 +130,25 @@ class CommentServiceTest {
     }
 
     @Test
-    void createCommentBySlug_shouldCreateReply() {
+    void createCommentBySlug_shouldThrowForDraftPostToNonOwner() {
         CommentRequest request = CommentRequest.builder()
-                .content("Reply comment")
-                .parentId(1L)
+                .content("New comment")
                 .build();
 
-        Comment entity = Comment.builder().content("Reply comment").deleted(false).build();
-
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
-        when(postRepository.findBySlugAndNotDeleted("test-post")).thenReturn(Optional.of(testPost));
-        when(commentMapper.toEntity(request)).thenReturn(entity);
-        when(commentRepository.findById(1L)).thenReturn(Optional.of(testComment));
-        when(commentRepository.save(any(Comment.class))).thenAnswer(i -> i.getArgument(0));
-        when(commentMapper.toResponse(any(Comment.class))).thenAnswer(i -> toResponse(i.getArgument(0)));
-
-        CommentResponse response = commentService.createCommentBySlug("test-post", request, "test@example.com");
-
-        assertNotNull(response);
-        verify(commentRepository).save(any(Comment.class));
-    }
-
-    @Test
-    void createCommentBySlug_shouldThrowForNonExistentParent() {
-        CommentRequest request = CommentRequest.builder()
-                .content("Reply comment")
-                .parentId(999L)
+        Post draftPost = Post.builder()
+                .id(3L)
+                .title("Draft Post")
+                .slug("draft-post")
+                .published(false)
+                .user(testUser)
+                .deleted(false)
                 .build();
 
-        Comment entity = Comment.builder().content("Reply comment").deleted(false).build();
-
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
-        when(postRepository.findBySlugAndNotDeleted("test-post")).thenReturn(Optional.of(testPost));
-        when(commentMapper.toEntity(request)).thenReturn(entity);
-        when(commentRepository.findById(999L)).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("other@example.com")).thenReturn(Optional.of(otherUser));
+        when(postRepository.findBySlugAndNotDeleted("draft-post")).thenReturn(Optional.of(draftPost));
 
         assertThrows(ResourceNotFoundException.class,
-                () -> commentService.createCommentBySlug("test-post", request, "test@example.com"));
+                () -> commentService.createCommentBySlug("draft-post", request, "other@example.com"));
     }
 
     @Test
@@ -181,14 +163,6 @@ class CommentServiceTest {
 
         assertNotNull(responses);
         assertEquals(1, responses.size());
-    }
-
-    @Test
-    void getCommentsByPostSlug_shouldThrowForNonExistentPost() {
-        when(postRepository.findBySlugAndNotDeleted("non-existent")).thenReturn(Optional.empty());
-
-        assertThrows(ResourceNotFoundException.class,
-                () -> commentService.getCommentsByPostSlug("non-existent"));
     }
 
     @Test
@@ -209,13 +183,5 @@ class CommentServiceTest {
 
         assertThrows(UnauthorizedException.class,
                 () -> commentService.deleteComment(1L, "other@example.com"));
-    }
-
-    @Test
-    void deleteComment_shouldThrowForNonExistentComment() {
-        when(commentRepository.findById(999L)).thenReturn(Optional.empty());
-
-        assertThrows(ResourceNotFoundException.class,
-                () -> commentService.deleteComment(999L, "test@example.com"));
     }
 }

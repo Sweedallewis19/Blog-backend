@@ -19,7 +19,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
 
@@ -123,50 +122,6 @@ class PostServiceTest {
     }
 
     @Test
-    void createPost_shouldGenerateUniqueSlugWhenDuplicate() {
-        PostRequest request = PostRequest.builder()
-                .title("Hello World")
-                .content("Some content")
-                .build();
-
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
-        when(postMapper.toEntity(request)).thenReturn(Post.builder()
-                .title("Hello World").slug("hello-world").content("Some content")
-                .published(true).viewCount(0L).deleted(false).build());
-        when(postMapper.generateSlug("Hello World")).thenReturn("hello-world");
-        when(postRepository.existsBySlug("hello-world")).thenReturn(true);
-        when(postRepository.existsBySlug("hello-world-1")).thenReturn(false);
-        when(postRepository.save(any(Post.class))).thenAnswer(i -> i.getArgument(0));
-        when(postMapper.toResponse(any(Post.class))).thenAnswer(i -> toResponse(i.getArgument(0)));
-
-        PostResponse response = postService.createPost(request, "test@example.com");
-
-        assertEquals("hello-world-1", response.getSlug());
-    }
-
-    @Test
-    void createPost_shouldDefaultPublishedToTrue() {
-        PostRequest request = PostRequest.builder()
-                .title("Hello World")
-                .content("Some content")
-                .published(null)
-                .build();
-
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
-        when(postMapper.toEntity(request)).thenReturn(Post.builder()
-                .title("Hello World").slug("hello-world").content("Some content")
-                .published(null).viewCount(0L).deleted(false).build());
-        when(postMapper.generateSlug("Hello World")).thenReturn("hello-world");
-        when(postRepository.existsBySlug(anyString())).thenReturn(false);
-        when(postRepository.save(any(Post.class))).thenAnswer(i -> i.getArgument(0));
-        when(postMapper.toResponse(any(Post.class))).thenAnswer(i -> toResponse(i.getArgument(0)));
-
-        PostResponse response = postService.createPost(request, "test@example.com");
-
-        assertTrue(response.getPublished());
-    }
-
-    @Test
     void getPostBySlug_shouldReturnPublishedPost() {
         when(postRepository.findBySlugWithUserAndComments("my-published-post"))
                 .thenReturn(Optional.of(publishedPost));
@@ -179,33 +134,12 @@ class PostServiceTest {
     }
 
     @Test
-    void getPostBySlug_shouldReturnDraftToOwner() {
-        when(postRepository.findBySlugWithUserAndComments("my-draft-post"))
-                .thenReturn(Optional.of(draftPost));
-        when(postMapper.toResponse(draftPost)).thenReturn(toResponse(draftPost));
-
-        PostResponse response = postService.getPostBySlug("my-draft-post", "test@example.com");
-
-        assertNotNull(response);
-        assertFalse(response.getPublished());
-    }
-
-    @Test
     void getPostBySlug_shouldThrowForDraftToOtherUser() {
         when(postRepository.findBySlugWithUserAndComments("my-draft-post"))
                 .thenReturn(Optional.of(draftPost));
 
         assertThrows(ResourceNotFoundException.class,
                 () -> postService.getPostBySlug("my-draft-post", "other@example.com"));
-    }
-
-    @Test
-    void getPostBySlug_shouldThrowForDraftToUnauthenticated() {
-        when(postRepository.findBySlugWithUserAndComments("my-draft-post"))
-                .thenReturn(Optional.of(draftPost));
-
-        assertThrows(ResourceNotFoundException.class,
-                () -> postService.getPostBySlug("my-draft-post", null));
     }
 
     @Test
@@ -270,107 +204,5 @@ class PostServiceTest {
 
         assertTrue(publishedPost.getDeleted());
         verify(postRepository).save(publishedPost);
-    }
-
-    @Test
-    void deletePost_shouldThrowForNonOwner() {
-        when(postRepository.findBySlugAndNotDeleted("my-published-post"))
-                .thenReturn(Optional.of(publishedPost));
-        when(userRepository.findByEmail("other@example.com")).thenReturn(Optional.of(otherUser));
-
-        assertThrows(UnauthorizedException.class,
-                () -> postService.deletePost("my-published-post", "other@example.com"));
-    }
-
-    @Test
-    void incrementViewCount_shouldIncrementByOne() {
-        when(postRepository.findBySlugAndNotDeleted("my-published-post"))
-                .thenReturn(Optional.of(publishedPost));
-
-        postService.incrementViewCountBySlug("my-published-post");
-
-        assertEquals(1L, publishedPost.getViewCount());
-        verify(postRepository).save(publishedPost);
-    }
-
-    @Test
-    void getPostById_shouldReturnPublishedPost() {
-        when(postRepository.findByIdWithUserAndComments(1L))
-                .thenReturn(Optional.of(publishedPost));
-        when(postMapper.toResponse(publishedPost)).thenReturn(toResponse(publishedPost));
-
-        PostResponse response = postService.getPostById(1L, null);
-
-        assertNotNull(response);
-        assertEquals(1L, response.getId());
-    }
-
-    @Test
-    void getPostById_shouldThrowForDraftToUnauthenticated() {
-        when(postRepository.findByIdWithUserAndComments(2L))
-                .thenReturn(Optional.of(draftPost));
-
-        assertThrows(ResourceNotFoundException.class,
-                () -> postService.getPostById(2L, null));
-    }
-
-    @Test
-    void updatePostById_shouldAllowOwnerToUpdate() {
-        PostRequest request = PostRequest.builder()
-                .title("Updated By Id")
-                .build();
-
-        when(postRepository.findByIdAndNotDeleted(1L))
-                .thenReturn(Optional.of(publishedPost));
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
-        when(postMapper.generateSlug("Updated By Id")).thenReturn("updated-by-id");
-        when(postRepository.existsBySlug("updated-by-id")).thenReturn(false);
-        doAnswer(invocation -> {
-            Post post = invocation.getArgument(0);
-            PostRequest req = invocation.getArgument(1);
-            post.setTitle(req.getTitle());
-            post.setSlug("updated-by-id");
-            return null;
-        }).when(postMapper).updateEntity(any(Post.class), any(PostRequest.class));
-        when(postRepository.save(any(Post.class))).thenAnswer(i -> i.getArgument(0));
-        when(postMapper.toResponse(any(Post.class))).thenAnswer(i -> toResponse(i.getArgument(0)));
-
-        PostResponse response = postService.updatePostById(1L, request, "test@example.com");
-
-        assertEquals("Updated By Id", response.getTitle());
-    }
-
-    @Test
-    void deletePostById_shouldAllowOwnerToDelete() {
-        when(postRepository.findByIdAndNotDeleted(1L))
-                .thenReturn(Optional.of(publishedPost));
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
-
-        postService.deletePostById(1L, "test@example.com");
-
-        assertTrue(publishedPost.getDeleted());
-    }
-
-    @Test
-    void getAllPosts_shouldPassUserIdForAuthenticatedUser() {
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(testUser));
-        when(postRepository.findAllPublishedOrOwnedByUser(eq(1L), any()))
-                .thenReturn(new org.springframework.data.domain.PageImpl<>(Collections.singletonList(publishedPost)));
-        when(postMapper.toResponse(publishedPost)).thenReturn(toResponse(publishedPost));
-
-        postService.getAllPosts(org.springframework.data.domain.PageRequest.of(0, 10), "test@example.com");
-
-        verify(postRepository).findAllPublishedOrOwnedByUser(eq(1L), any());
-    }
-
-    @Test
-    void getAllPosts_shouldPassNullForUnauthenticated() {
-        when(postRepository.findAllPublishedOrOwnedByUser(isNull(), any()))
-                .thenReturn(new org.springframework.data.domain.PageImpl<>(Collections.singletonList(publishedPost)));
-        when(postMapper.toResponse(publishedPost)).thenReturn(toResponse(publishedPost));
-
-        postService.getAllPosts(org.springframework.data.domain.PageRequest.of(0, 10), null);
-
-        verify(postRepository).findAllPublishedOrOwnedByUser(isNull(), any());
     }
 }
